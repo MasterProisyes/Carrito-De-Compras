@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://kit.fontawesome.com/7f2ba0744c.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Dashboard</h1>
+        <form id="product-form" class="mb-3">
+            <div class="form-group">
+                <label for="product-name">Nombre:</label>
+                <input type="text" class="form-control" id="product-name" required>
+            </div>
+            <div class="form-group">
+                <label for="product-price">Precio:</label>
+                <input type="number" class="form-control" id="product-price" required>
+            </div>
+            <div class="form-group">
+                <input type="file" class="d-none" id="product-image" accept="image/*">
+                <label for="product-image" class="btn btn-primary">Cargar Imagen</label>
+            </div>
+            <button type="submit" class="btn btn-success">Agregar Producto</button>
+        </form>
+        <!--Preview-->
+        <div class="preview">
+            <h1 class="preview-title">Previsualizacion</h1>
+            <div class="row" id="product-list"></div>
+        </div>
+
+    </div>
+
+    <!-- Firebase JavaScript SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js';
+        import { getFirestore, collection, getDocs, doc, deleteDoc, addDoc } from 'https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js';
+        import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.11.1/firebase-storage.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD3NSTuSmw1cIQ9gNp-d5k0PYcLqAbitJc",
+            authDomain: "thekingburgerd.firebaseapp.com",
+            projectId: "thekingburgerd",
+            storageBucket: "thekingburgerd.appspot.com",
+            messagingSenderId: "112179096459",
+            appId: "1:112179096459:web:365773e3b0d02592aa9d8e"
+        };
+
+        const firebaseApp = initializeApp(firebaseConfig);
+        const db = getFirestore(firebaseApp);
+        const storage = getStorage(firebaseApp);
+        const productListElement = document.getElementById('product-list');
+
+
+        async function renderProductList() {
+            const productsRef = collection(db, 'products');
+            const querySnapshot = await getDocs(productsRef);
+            productListElement.innerHTML = '';
+            querySnapshot.forEach((doc) => {
+                const product = doc.data();
+                const item = document.createElement('div');
+                item.classList.add('col-md-4', 'mb-3');
+                item.innerHTML = `
+            <div class="card">
+                <img src="${product.image}" class="card-img-top" alt="${product.name}">
+                <div class="card-body">
+                    <h5 class="card-title">${product.name}</h5>
+                    <p class="card-text">$${product.price}</p>
+                    <button class="btn btn-danger" onclick="eliminarProducto('${doc.id}', '${product.image}')"><i class="fa-solid fa-trash" style="color: #ffffff;"></i></button>
+                </div>
+            </div>
+        `;
+                productListElement.appendChild(item);
+            });
+        }
+
+
+        window.eliminarProducto = async function  eliminarProducto  (id, imageURL) {
+            // Eliminar el documento del producto de Firestore
+            await deleteDoc(doc(db, 'products', id));
+
+            // Eliminar la imagen asociada en Firebase Storage
+            const storageRef = refFromURL(imageURL);
+            await deleteObject(storageRef);
+
+            // Volver a renderizar la lista de productos
+            renderProductList();
+        }
+
+
+        document.addEventListener('DOMContentLoaded', function () {
+            renderProductList();
+        });
+
+
+        // Aquí se encuentra el código original para agregar un producto
+        const productForm = document.getElementById('product-form');
+
+        productForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const productName = document.getElementById('product-name').value;
+            const productPrice = parseFloat(document.getElementById('product-price').value);
+            const productImage = document.getElementById('product-image').files[0];
+
+            // Subir la imagen a Firebase Storage
+            const storageRef = ref(storage, 'images/' + productImage.name);
+            await uploadBytes(storageRef, productImage);
+
+            // Obtener la URL de la imagen
+            const imageURL = await getDownloadURL(storageRef);
+
+            // Guardar el producto en Firestore con la URL de la imagen
+            await addDoc(collection(db, 'products'), { name: productName, price: productPrice, image: imageURL });
+
+            // Limpiar el formulario
+            productForm.reset();
+
+            // Volver a renderizar la lista de productos
+            renderProductList();
+        });
+    </script>
+
+</body>
+
+</html>
